@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReBooker - בדוק אם שילמת יותר מדי על המלון</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Assistant', sans-serif; background-color: #f8fafc; }
+        .main-card { border-top: 4px solid; border-image: linear-gradient(to right, #14b8a6, #06b6d4) 1; }
+        .loader { border-top-color: #06b6d4; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .dragover { background-color: #f0f9ff; border-color: #0ea5e9; }
+        .modal-backdrop { background-color: rgba(0, 0, 0, 0.5); }
+        .confidence-low { border-color: #facc15; } /* yellow-400 */
+        .confidence-medium { border-color: #fb923c; } /* orange-400 */
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-2xl">
+        
+        <header class="text-center mb-10">
+            <h1 class="text-5xl sm:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-500">ReBooker</h1>
+            <p class="text-lg sm:text-xl text-slate-600 mt-3">שילמת יותר מדי על המלון שלך? גלה בפחות מדקה.</p>
+        </header>
+
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 main-card">
+            <!-- Tabs for input method -->
+            <div class="flex border-b mb-6">
+                <button id="tab-upload" class="flex-1 py-3 text-lg font-bold border-b-4 border-cyan-500 text-cyan-600">העלאת קובץ</button>
+                <button id="tab-manual" class="flex-1 py-3 text-lg font-bold border-b-4 border-transparent text-slate-500">הזנה ידנית</button>
+            </div>
+            
+            <!-- Upload Form -->
+            <div id="upload-form">
+                <label for="file-upload" class="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg p-10 text-center hover:bg-slate-50 transition-colors duration-300">
+                    <svg class="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <p class="mt-2 font-semibold text-slate-600">גרור לכאן או לחץ כדי להעלות קובץ</p>
+                    <p class="text-sm text-slate-500">תומך בקבצי PDF, תמונה (JPG/PNG) וטקסט (TXT)</p>
+                    <input id="file-upload" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.txt">
+                </label>
+                <p id="file-name" class="text-center mt-4 text-teal-600 font-semibold"></p>
+            </div>
+
+            <!-- Manual Form (hidden by default) -->
+            <div id="manual-form" class="hidden space-y-4">
+                 <div>
+                    <label for="manual-hotel-name" class="block text-sm font-medium text-slate-700">שם המלון</label>
+                    <input type="text" id="manual-hotel-name" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500" placeholder="לדוגמה: Angsana Laguna Phuket">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="manual-check-in" class="block text-sm font-medium text-slate-700">צ'ק-אין</label>
+                        <input type="date" id="manual-check-in" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                    </div>
+                    <div>
+                        <label for="manual-check-out" class="block text-sm font-medium text-slate-700">צ'ק-אאוט</label>
+                        <input type="date" id="manual-check-out" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                    </div>
+                </div>
+                 <div>
+                    <label for="manual-room-type" class="block text-sm font-medium text-slate-700">סוג החדר</label>
+                    <input type="text" id="manual-room-type" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500" placeholder="לדוגמה: Laguna Grand Room - King">
+                </div>
+                <div class="flex items-end gap-2">
+                    <div class="flex-grow">
+                        <label for="manual-price" class="block text-sm font-medium text-slate-700">המחיר ששילמת (ללילה)</label>
+                        <input type="number" id="manual-price" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500" placeholder="לדוגמה: 6232">
+                    </div>
+                    <div>
+                         <label for="manual-currency" class="block text-sm font-medium text-slate-700">מטבע</label>
+                        <select id="manual-currency" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                            <option>THB</option>
+                            <option>USD</option>
+                            <option>ILS</option>
+                        </select>
+                    </div>
+                </div>
+                <button id="manual-submit-button" class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-xl font-bold py-4 px-4 rounded-lg hover:opacity-90 transition-opacity duration-300 shadow-lg !mt-6">
+                    אשר פרטים וחפש חיסכון
+                </button>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" class="mt-8 hidden">
+             <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
+                <div id="loading" class="text-center hidden">
+                    <div class="loader ease-linear rounded-full border-8 border-t-8 border-slate-200 h-24 w-24 mx-auto"></div>
+                    <p id="loading-text" class="mt-4 text-lg text-slate-600"></p>
+                </div>
+                <div id="results-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Verification Modal -->
+    <div id="verification-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop hidden">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-lg mx-4">
+            <h2 class="text-2xl font-bold text-slate-800">אימות פרטים</h2>
+            <p class="text-slate-600 mt-2">אלו הפרטים שזיהינו מהקובץ שלך. אנא ודא שהם נכונים ותקן במידת הצורך. שדות ב<span class="text-orange-500 font-semibold">כתום</span> זוהו בביטחון בינוני.</p>
+            <div class="space-y-4 mt-6">
+                <div>
+                    <label for="modal-hotel-name" class="block text-sm font-medium text-slate-700">שם המלון</label>
+                    <input type="text" id="modal-hotel-name" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 transition-colors">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="modal-check-in" class="block text-sm font-medium text-slate-700">צ'ק-אין</label>
+                        <input type="date" id="modal-check-in" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 transition-colors">
+                    </div>
+                    <div>
+                        <label for="modal-check-out" class="block text-sm font-medium text-slate-700">צ'ק-אאוט</label>
+                        <input type="date" id="modal-check-out" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 transition-colors">
+                    </div>
+                </div>
+                <div>
+                    <label for="modal-room-type" class="block text-sm font-medium text-slate-700">סוג החדר</label>
+                    <input type="text" id="modal-room-type" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 transition-colors">
+                </div>
+                <div class="flex items-end gap-2">
+                    <div class="flex-grow">
+                        <label for="modal-price" class="block text-sm font-medium text-slate-700">המחיר ששילמת (ללילה)</label>
+                        <input type="number" id="modal-price" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 transition-colors">
+                    </div>
+                    <div>
+                         <label for="modal-currency" class="block text-sm font-medium text-slate-700">מטבע</label>
+                        <select id="modal-currency" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 transition-colors">
+                            <option>THB</option>
+                            <option>USD</option>
+                            <option>ILS</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-8 flex justify-end space-x-4 space-x-reverse">
+                <button id="modal-cancel" class="px-6 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">ביטול</button>
+                <button id="modal-confirm" class="px-6 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-lg hover:opacity-90">אשר וחפש חיסכון</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const uploadForm = document.getElementById('upload-form');
+        const manualForm = document.getElementById('manual-form');
+        const tabUpload = document.getElementById('tab-upload');
+        const tabManual = document.getElementById('tab-manual');
+        const fileUploadInput = document.getElementById('file-upload');
+        const fileNameDisplay = document.getElementById('file-name');
+        const resultsSection = document.getElementById('results-section');
+        const loadingDiv = document.getElementById('loading');
+        const loadingText = document.getElementById('loading-text');
+        const resultsContentDiv = document.getElementById('results-content');
+        const uploadLabel = document.querySelector('label[for="file-upload"]');
+        const verificationModal = document.getElementById('verification-modal');
+        const manualSubmitButton = document.getElementById('manual-submit-button');
+
+        // --- Tab Switching Logic ---
+        tabUpload.addEventListener('click', () => switchTab('upload'));
+        tabManual.addEventListener('click', () => switchTab('manual'));
+
+        function switchTab(tabName) {
+            if(tabName === 'upload') {
+                uploadForm.classList.remove('hidden');
+                manualForm.classList.add('hidden');
+                tabUpload.classList.add('border-cyan-500', 'text-cyan-600');
+                tabUpload.classList.remove('border-transparent', 'text-slate-500');
+                tabManual.classList.add('border-transparent', 'text-slate-500');
+                tabManual.classList.remove('border-cyan-500', 'text-cyan-600');
+            } else {
+                manualForm.classList.remove('hidden');
+                uploadForm.classList.add('hidden');
+                tabManual.classList.add('border-cyan-500', 'text-cyan-600');
+                tabManual.classList.remove('border-transparent', 'text-slate-500');
+                tabUpload.classList.add('border-transparent', 'text-slate-500');
+                tabUpload.classList.remove('border-cyan-500', 'text-cyan-600');
+            }
+        }
+
+        // --- File Upload Logic ---
+        function handleFileSelect(file) {
+            const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'text/plain'];
+            if (file && allowedTypes.includes(file.type)) {
+                fileNameDisplay.textContent = `קובץ נבחר: ${file.name}`;
+                fileNameDisplay.classList.remove('text-red-500');
+                processFile(file);
+            } else {
+                fileNameDisplay.textContent = file ? 'סוג קובץ לא נתמך.' : '';
+                fileNameDisplay.classList.add('text-red-500');
+            }
+        }
+
+        fileUploadInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0]));
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadLabel.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+            uploadLabel.addEventListener(eventName, () => uploadLabel.classList.toggle('dragover', eventName.includes('enter') || eventName.includes('over')), false);
+        });
+        uploadLabel.addEventListener('drop', (e) => handleFileSelect(e.dataTransfer.files[0]), false);
+
+        async function processFile(file) {
+            showLoading("מנתח את הקובץ שלך...");
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('http://127.0.0.1:5001/parse-booking', { method: 'POST', body: formData });
+                const data = await response.json(); // Always expect JSON
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to parse file');
+                }
+                hideLoading();
+                openVerificationModal(data);
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        // --- Manual Input Logic ---
+        manualSubmitButton.addEventListener('click', () => {
+            const data = {
+                hotel_name: document.getElementById('manual-hotel-name').value,
+                check_in_date: document.getElementById('manual-check-in').value,
+                check_out_date: document.getElementById('manual-check-out').value,
+                room_type: document.getElementById('manual-room-type').value,
+                original_price_per_night: parseFloat(document.getElementById('manual-price').value) || 0,
+                currency: document.getElementById('manual-currency').value
+            };
+            if (!data.hotel_name || !data.check_in_date || !data.check_out_date) {
+                alert('אנא מלא את כל שדות החובה.');
+                return;
+            }
+            findDeals(data);
+        });
+
+        // --- Verification Modal Logic ---
+        function openVerificationModal(data) {
+            const fields = {
+                'hotel-name': data.hotel_name,
+                'check-in': data.check_in_date,
+                'check-out': data.check_out_date,
+                'room-type': data.room_type,
+                'price': data.original_price_per_night,
+                'currency': data.currency
+            };
+
+            for (const [id, value] of Object.entries(fields)) {
+                const el = document.getElementById(`modal-${id}`);
+                if (el) el.value = value || (id === 'price' ? 0 : '');
+            }
+            
+            if (data.confidence) {
+                for (const [key, confidence] of Object.entries(data.confidence)) {
+                    const el = document.getElementById(`modal-${key.replace(/_/g, '-')}`);
+                    if (el) {
+                        el.classList.remove('confidence-low', 'confidence-medium');
+                        if (confidence === 'low') el.classList.add('confidence-low');
+                        if (confidence === 'medium') el.classList.add('confidence-medium');
+                    }
+                }
+            }
+
+            verificationModal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            verificationModal.classList.add('hidden');
+            resetForms();
+        }
+
+        document.getElementById('modal-cancel').addEventListener('click', closeModal);
+
+        document.getElementById('modal-confirm').addEventListener('click', () => {
+            const verifiedData = {
+                hotel_name: document.getElementById('modal-hotel-name').value,
+                check_in_date: document.getElementById('modal-check-in').value,
+                check_out_date: document.getElementById('modal-check-out').value,
+                room_type: document.getElementById('modal-room-type').value,
+                original_price_per_night: parseFloat(document.getElementById('modal-price').value) || 0,
+                currency: document.getElementById('modal-currency').value
+            };
+            closeModal();
+            findDeals(verifiedData);
+        });
+
+        // --- Core Logic: Find Deals ---
+        async function findDeals(bookingData) {
+            showLoading("סורק את הרשת למציאת דילים טובים יותר...");
+            try {
+                const response = await fetch('http://127.0.0.1:5001/find-deals', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookingData),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Server error');
+                }
+                resultsContentDiv.innerHTML = buildResultHtml(data);
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // --- UI Helper Functions ---
+        function showLoading(text) {
+            resultsSection.classList.remove('hidden');
+            loadingDiv.classList.remove('hidden');
+            loadingText.innerHTML = text;
+            resultsContentDiv.innerHTML = '';
+        }
+
+        function hideLoading() {
+            loadingDiv.classList.add('hidden');
+        }
+
+        function showError(message) {
+            resultsSection.classList.remove('hidden');
+            hideLoading();
+            resultsContentDiv.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-500">אופס, משהו השתבש</h2><p class="mt-2 text-slate-600">${message}</p></div>`;
+        }
+        
+        function resetForms() {
+            fileNameDisplay.textContent = '';
+            fileUploadInput.value = '';
+            document.getElementById('manual-hotel-name').value = '';
+            document.getElementById('manual-check-in').value = '';
+            document.getElementById('manual-check-out').value = '';
+            document.getElementById('manual-room-type').value = '';
+            document.getElementById('manual-price').value = '';
+        }
+
+        function buildResultHtml(response) {
+            if (response.status === "SAVINGS_FOUND") {
+                const { title, message, savings_summary } = response;
+                return `
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-teal-100 text-teal-500 rounded-full flex items-center justify-center mx-auto">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 6v-1m0-1V4m0 2.01V5M12 20v-1m0 1v.01M12 18v-1m0-1v-5m-4 5h8a2 2 0 002-2V9a2 2 0 00-2-2H8a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg>
+                        </div>
+                        <h2 class="text-3xl font-bold text-slate-800 mt-4">${title}</h2>
+                        <p class="mt-2 text-slate-600">${message}</p>
+                        <div class="mt-6 bg-slate-50 rounded-lg p-4">
+                            <p class="text-lg text-slate-500">החיסכון שלך:</p>
+                            <p class="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-500 my-2">${savings_summary.savings_thb.toLocaleString()}฿</p>
+                            <p class="text-2xl text-slate-700">(כ-${savings_summary.savings_ils.toLocaleString()}₪)</p>
+                        </div>
+                        <button class="mt-8 w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-xl font-bold py-4 px-4 rounded-lg hover:opacity-90 transition shadow-lg">הזמן עכשיו וחסוך</button>
+                    </div>`;
+            } else {
+                const { title, message } = response;
+                return `
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-sky-100 text-sky-500 rounded-full flex items-center justify-center mx-auto">
+                           <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                        <h2 class="text-3xl font-bold text-slate-800 mt-4">${title}</h2>
+                        <p class="mt-4 text-lg text-slate-600">${message}</p>
+                    </div>`;
+            }
+        }
+    </script>
+</body>
+</html>
