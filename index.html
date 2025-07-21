@@ -3,103 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ReBooker - בדוק אם שילמת יותר מדי על המלון</title>
+    <title>שילמתי יותר מדי - בדוק אם תוכל לחסוך כסף על המלון</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
+    <!-- PDF.js library for reading PDFs in the browser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <style>
         body { font-family: 'Assistant', sans-serif; background-color: #f8fafc; }
         .main-card { border-top: 4px solid; border-image: linear-gradient(to right, #14b8a6, #06b6d4) 1; }
-        .loader { border-top-color: #06b6d4; animation: spinner 1.5s linear infinite; }
-        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* New Loader Animation */
+        .loader-container {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            margin: 0 auto;
+        }
+        .loader-svg {
+            transform: rotate(-90deg);
+            width: 100%;
+            height: 100%;
+        }
+        .loader-bg {
+            stroke: #e5e7eb; /* gray-200 */
+            fill: none;
+            stroke-width: 10;
+        }
+        .loader-progress {
+            stroke: #06b6d4; /* cyan-500 */
+            fill: none;
+            stroke-width: 10;
+            stroke-linecap: round;
+            stroke-dasharray: 283;
+            stroke-dashoffset: 283;
+            animation: fill-spinner 2s linear infinite;
+        }
+        @keyframes fill-spinner {
+            0%, 100% { stroke-dashoffset: 283; }
+            50% { stroke-dashoffset: 75; }
+        }
+        
         .dragover { background-color: #f0f9ff; border-color: #0ea5e9; }
         .modal-backdrop { background-color: rgba(0, 0, 0, 0.5); }
-        .confidence-low { border-color: #facc15; } /* yellow-400 */
-        .confidence-medium { border-color: #fb923c; } /* orange-400 */
+        /* Confidence level styling */
+        .confidence-low { border-color: #f87171; /* red-400 */ }
+        .confidence-medium { border-color: #fb923c; /* orange-400 */ }
+        .input-error { border-color: #f87171; }
+        .price-comparison-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.5rem 1rem;
+            align-items: center;
+        }
+        /* Animation for results */
+        @keyframes appear {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .result-appear {
+            animation: appear 0.6s ease-out forwards;
+        }
+        /* Button press animation */
+        button:active {
+            transform: scale(0.97);
+            transition: transform 0.1s ease;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
     <div class="container mx-auto p-4 sm:p-6 md:p-8 max-w-2xl">
         
         <header class="text-center mb-10">
-            <h1 class="text-5xl sm:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-500">ReBooker</h1>
-            <p class="text-lg sm:text-xl text-slate-600 mt-3">שילמת יותר מדי על המלון שלך? גלה בפחות מדקה.</p>
+            <h1 class="text-5xl sm:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-500">שילמתי יותר מדי</h1>
+            <p class="text-lg sm:text-xl text-slate-600 mt-3">שילמת יותר מדי על המלון שלך? גלה בפחות מדקה ותוכל לחסוך כסף.</p>
         </header>
 
         <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 main-card">
-            <!-- Tabs for input method -->
-            <div class="flex border-b mb-6">
-                <button id="tab-upload" class="flex-1 py-3 text-lg font-bold border-b-4 border-cyan-500 text-cyan-600">העלאת קובץ</button>
-                <button id="tab-manual" class="flex-1 py-3 text-lg font-bold border-b-4 border-transparent text-slate-500">הזנה ידנית</button>
-            </div>
+              <div class="flex border-b mb-6">
+                  <button id="tab-upload" class="flex-1 py-3 text-lg font-bold border-b-4 border-cyan-500 text-cyan-600">העלאת קובץ</button>
+                  <button id="tab-manual" class="flex-1 py-3 text-lg font-bold border-b-4 border-transparent text-slate-500">הזנה ידנית</button>
+              </div>
             
-            <!-- Upload Form -->
-            <div id="upload-form">
-                <label for="file-upload" class="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg p-10 text-center hover:bg-slate-50 transition-colors duration-300">
-                    <svg class="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                    <p class="mt-2 font-semibold text-slate-600">גרור לכאן או לחץ כדי להעלות קובץ</p>
-                    <p class="text-sm text-slate-500">תומך בקבצי PDF, תמונה (JPG/PNG) וטקסט (TXT)</p>
-                    <input id="file-upload" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.txt">
-                </label>
-                <p id="file-name" class="text-center mt-4 text-teal-600 font-semibold"></p>
-            </div>
+              <div id="upload-form">
+                  <label for="file-upload" class="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-lg p-10 text-center hover:bg-slate-50 transition-colors duration-300">
+                      <svg class="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                      <p class="mt-2 font-semibold text-slate-600">גרור לכאן או לחץ כדי להעלות קובץ</p>
+                      <p class="text-sm text-slate-500">תומך בקבצי PDF, תמונה (JPG/PNG) וטקסט (TXT)</p>
+                      <input id="file-upload" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.txt">
+                  </label>
+                  <p id="file-name" class="text-center mt-4 font-semibold"></p>
+              </div>
 
-            <!-- Manual Form (hidden by default) -->
-            <div id="manual-form" class="hidden space-y-4">
-                 <div>
-                    <label for="manual-hotel-name" class="block text-sm font-medium text-slate-700">שם המלון</label>
-                    <input type="text" id="manual-hotel-name" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500" placeholder="לדוגמה: Angsana Laguna Phuket">
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label for="manual-check-in" class="block text-sm font-medium text-slate-700">צ'ק-אין</label>
-                        <input type="date" id="manual-check-in" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
-                    </div>
-                    <div>
-                        <label for="manual-check-out" class="block text-sm font-medium text-slate-700">צ'ק-אאוט</label>
-                        <input type="date" id="manual-check-out" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
-                    </div>
-                </div>
-                 <div>
-                    <label for="manual-room-type" class="block text-sm font-medium text-slate-700">סוג החדר</label>
-                    <input type="text" id="manual-room-type" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500" placeholder="לדוגמה: Laguna Grand Room - King">
-                </div>
-                <div class="flex items-end gap-2">
-                    <div class="flex-grow">
-                        <label for="manual-price" class="block text-sm font-medium text-slate-700">המחיר ששילמת (ללילה)</label>
-                        <input type="number" id="manual-price" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500" placeholder="לדוגמה: 6232">
-                    </div>
-                    <div>
-                         <label for="manual-currency" class="block text-sm font-medium text-slate-700">מטבע</label>
-                        <select id="manual-currency" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
-                            <option>THB</option>
-                            <option>USD</option>
-                            <option>ILS</option>
-                        </select>
-                    </div>
-                </div>
-                <button id="manual-submit-button" class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-xl font-bold py-4 px-4 rounded-lg hover:opacity-90 transition-opacity duration-300 shadow-lg !mt-6">
-                    אשר פרטים וחפש חיסכון
-                </button>
-            </div>
+              <form id="manual-form" class="hidden space-y-4" autocomplete="off">
+                  <div>
+                      <label for="manual-hotel-name" class="block text-sm font-medium text-slate-700">שם המלון</label>
+                      <input type="text" id="manual-hotel-name" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500" placeholder="לדוגמה: Angsana Laguna Phuket">
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                          <label for="manual-check-in" class="block text-sm font-medium text-slate-700">צ'ק-אין</label>
+                          <input type="date" id="manual-check-in" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                      </div>
+                      <div>
+                          <label for="manual-check-out" class="block text-sm font-medium text-slate-700">צ'ק-אאוט</label>
+                          <input type="date" id="manual-check-out" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                      </div>
+                  </div>
+                  <div>
+                      <label for="manual-room-type" class="block text-sm font-medium text-slate-700">סוג החדר (אופציונלי)</label>
+                      <input type="text" id="manual-room-type" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500" placeholder="לדוגמה: Laguna Grand Room - King">
+                  </div>
+                  <div class="flex items-end gap-2">
+                      <div class="flex-grow">
+                          <label for="manual-price" class="block text-sm font-medium text-slate-700">המחיר ששילמת (סה"כ או ללילה)</label>
+                          <input type="number" id="manual-price" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500" placeholder="לדוגמה: 6232">
+                      </div>
+                      <div>
+                          <label for="manual-currency" class="block text-sm font-medium text-slate-700">מטבע</label>
+                          <select id="manual-currency" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500">
+                              <option>THB</option>
+                              <option>USD</option>
+                              <option>EUR</option>
+                              <option>GBP</option>
+                              <option selected>ILS</option>
+                          </select>
+                      </div>
+                  </div>
+                  <p id="manual-form-error" class="text-red-500 text-sm text-center"></p>
+                  <button id="manual-submit-button" type="button" class="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-xl font-bold py-4 px-4 rounded-lg hover:opacity-90 transition-opacity duration-300 shadow-lg !mt-6">
+                      אשר פרטים וחפש חיסכון
+                  </button>
+              </form>
         </div>
 
-        <!-- Results Section -->
         <div id="results-section" class="mt-8 hidden">
-             <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
-                <div id="loading" class="text-center hidden">
-                    <div class="loader ease-linear rounded-full border-8 border-t-8 border-slate-200 h-24 w-24 mx-auto"></div>
-                    <p id="loading-text" class="mt-4 text-lg text-slate-600"></p>
-                </div>
-                <div id="results-content"></div>
-            </div>
+              <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
+                  <div id="loading" class="text-center hidden">
+                      <div class="loader-container">
+                          <svg class="loader-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                              <circle class="loader-bg" cx="50" cy="50" r="45"></circle>
+                              <circle class="loader-progress" cx="50" cy="50" r="45"></circle>
+                          </svg>
+                      </div>
+                      <p id="loading-text" class="mt-4 text-lg text-slate-600"></p>
+                  </div>
+                  <div id="results-content"></div>
+              </div>
         </div>
+        
+        <footer class="text-center mt-8 text-sm text-slate-500">
+            Powered by Google Gemini
+        </footer>
     </div>
 
     <!-- Verification Modal -->
     <div id="verification-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop hidden">
         <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-lg mx-4">
             <h2 class="text-2xl font-bold text-slate-800">אימות פרטים</h2>
-            <p class="text-slate-600 mt-2">אלו הפרטים שזיהינו מהקובץ שלך. אנא ודא שהם נכונים ותקן במידת הצורך. שדות ב<span class="text-orange-500 font-semibold">כתום</span> זוהו בביטחון בינוני.</p>
+            <p class="text-slate-600 mt-2">אלו הפרטים שזיהינו מהקובץ שלך. אנא ודא שהם נכונים ותקן במידת הצורך. שדות ב<span class="text-orange-500 font-semibold">כתום</span> זוהו בביטחון בינוני, וב<span class="text-red-500 font-semibold">אדום</span> בביטחון נמוך.</p>
             <div class="space-y-4 mt-6">
                 <div>
                     <label for="modal-hotel-name" class="block text-sm font-medium text-slate-700">שם המלון</label>
@@ -121,14 +182,16 @@
                 </div>
                 <div class="flex items-end gap-2">
                     <div class="flex-grow">
-                        <label for="modal-price" class="block text-sm font-medium text-slate-700">המחיר ששילמת (ללילה)</label>
+                        <label for="modal-price" class="block text-sm font-medium text-slate-700">המחיר ששילמת (סה"כ או ללילה)</label>
                         <input type="number" id="modal-price" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 transition-colors">
                     </div>
                     <div>
-                         <label for="modal-currency" class="block text-sm font-medium text-slate-700">מטבע</label>
+                        <label for="modal-currency" class="block text-sm font-medium text-slate-700">מטבע</label>
                         <select id="modal-currency" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 transition-colors">
                             <option>THB</option>
                             <option>USD</option>
+                            <option>EUR</option>
+                            <option>GBP</option>
                             <option>ILS</option>
                         </select>
                     </div>
@@ -142,117 +205,203 @@
     </div>
 
     <script>
-        // DOM Elements
-        const uploadForm = document.getElementById('upload-form');
-        const manualForm = document.getElementById('manual-form');
-        const tabUpload = document.getElementById('tab-upload');
-        const tabManual = document.getElementById('tab-manual');
-        const fileUploadInput = document.getElementById('file-upload');
-        const fileNameDisplay = document.getElementById('file-name');
-        const resultsSection = document.getElementById('results-section');
-        const loadingDiv = document.getElementById('loading');
-        const loadingText = document.getElementById('loading-text');
-        const resultsContentDiv = document.getElementById('results-content');
-        const uploadLabel = document.querySelector('label[for="file-upload"]');
-        const verificationModal = document.getElementById('verification-modal');
-        const manualSubmitButton = document.getElementById('manual-submit-button');
+        // --- Configuration ---
+        // IMPORTANT: The API key is handled by the execution environment. Do not hardcode it here.
+        const GEMINI_API_KEY = ""; 
+        const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
 
-        // --- Tab Switching Logic ---
-        tabUpload.addEventListener('click', () => switchTab('upload'));
-        tabManual.addEventListener('click', () => switchTab('manual'));
+        // --- Global State ---
+        let loadingInterval;
+
+        // --- DOM Elements ---
+        const ui = {
+            uploadForm: document.getElementById('upload-form'),
+            manualForm: document.getElementById('manual-form'),
+            tabUpload: document.getElementById('tab-upload'),
+            tabManual: document.getElementById('tab-manual'),
+            fileUploadInput: document.getElementById('file-upload'),
+            fileNameDisplay: document.getElementById('file-name'),
+            resultsSection: document.getElementById('results-section'),
+            loadingDiv: document.getElementById('loading'),
+            loadingText: document.getElementById('loading-text'),
+            resultsContentDiv: document.getElementById('results-content'),
+            uploadLabel: document.querySelector('label[for="file-upload"]'),
+            verificationModal: document.getElementById('verification-modal'),
+            manualSubmitButton: document.getElementById('manual-submit-button'),
+            manualFormError: document.getElementById('manual-form-error'),
+            manualCheckIn: document.getElementById('manual-check-in'),
+            manualCheckOut: document.getElementById('manual-check-out'),
+        };
+
+        // --- Initial Setup ---
+        window.onload = () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.querySelectorAll('input[type="date"]').forEach(el => el.min = today);
+        };
+
+        // --- Event Listeners ---
+        ui.tabUpload.addEventListener('click', () => switchTab('upload'));
+        ui.tabManual.addEventListener('click', () => switchTab('manual'));
+        ui.fileUploadInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0]));
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            ui.uploadLabel.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false); // Prevent browser from opening file
+            ui.uploadLabel.addEventListener(eventName, () => ui.uploadLabel.classList.toggle('dragover', ['dragenter', 'dragover'].includes(eventName)), false);
+        });
+        ui.uploadLabel.addEventListener('drop', (e) => handleFileSelect(e.dataTransfer.files[0]), false);
+        ui.manualSubmitButton.addEventListener('click', handleManualSubmit);
+        document.getElementById('modal-cancel').addEventListener('click', closeModal);
+        document.getElementById('modal-confirm').addEventListener('click', handleModalConfirm);
+        
+        // Event delegation for dynamically created buttons
+        ui.resultsContentDiv.addEventListener('click', function(event) {
+            const target = event.target.closest('button');
+            if (!target) return;
+
+            if (target.id === 'share-button') {
+                const savingsIls = target.dataset.savingsIls;
+                const savingsCurrency = target.dataset.savingsCurrency;
+                handleShare(savingsIls, savingsCurrency);
+            }
+        });
+
+        // Date validation listener
+        ui.manualCheckIn.addEventListener('change', () => {
+            if (ui.manualCheckIn.value) {
+                ui.manualCheckOut.min = ui.manualCheckIn.value;
+            }
+        });
+
+
+        // --- Main Logic ---
 
         function switchTab(tabName) {
-            if(tabName === 'upload') {
-                uploadForm.classList.remove('hidden');
-                manualForm.classList.add('hidden');
-                tabUpload.classList.add('border-cyan-500', 'text-cyan-600');
-                tabUpload.classList.remove('border-transparent', 'text-slate-500');
-                tabManual.classList.add('border-transparent', 'text-slate-500');
-                tabManual.classList.remove('border-cyan-500', 'text-cyan-600');
-            } else {
-                manualForm.classList.remove('hidden');
-                uploadForm.classList.add('hidden');
-                tabManual.classList.add('border-cyan-500', 'text-cyan-600');
-                tabManual.classList.remove('border-transparent', 'text-slate-500');
-                tabUpload.classList.add('border-transparent', 'text-slate-500');
-                tabUpload.classList.remove('border-cyan-500', 'text-cyan-600');
-            }
+            const isUpload = tabName === 'upload';
+            ui.uploadForm.classList.toggle('hidden', !isUpload);
+            ui.manualForm.classList.toggle('hidden', isUpload);
+            ui.tabUpload.classList.toggle('border-cyan-500', isUpload);
+            ui.tabUpload.classList.toggle('text-cyan-600', isUpload);
+            ui.tabUpload.classList.toggle('border-transparent', !isUpload);
+            ui.tabUpload.classList.toggle('text-slate-500', !isUpload);
+            ui.tabManual.classList.toggle('border-cyan-500', !isUpload);
+            ui.tabManual.classList.toggle('text-cyan-600', !isUpload);
+            ui.tabManual.classList.toggle('border-transparent', isUpload);
+            ui.tabManual.classList.toggle('text-slate-500', isUpload);
+            resetForms();
         }
 
-        // --- File Upload Logic ---
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        function validateManualForm() {
+            const fields = [
+                'manual-hotel-name', 'manual-check-in', 'manual-check-out', 'manual-price'
+            ];
+            let isValid = true;
+            ui.manualFormError.textContent = '';
+
+            fields.forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('input-error');
+                if (!el.value) {
+                    el.classList.add('input-error');
+                    isValid = false;
+                }
+            });
+            
+            if (isValid && ui.manualCheckIn.value && ui.manualCheckOut.value && ui.manualCheckOut.value < ui.manualCheckIn.value) {
+                ui.manualFormError.textContent = 'תאריך צ\'ק-אאוט לא יכול להיות לפני תאריך צ\'ק-אין.';
+                ui.manualCheckIn.classList.add('input-error');
+                ui.manualCheckOut.classList.add('input-error');
+                isValid = false;
+            }
+
+            if (!isValid && !ui.manualFormError.textContent) {
+                ui.manualFormError.textContent = 'אנא מלא את כל שדות החובה המסומנים.';
+            }
+            return isValid;
+        }
+
         function handleFileSelect(file) {
             const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'text/plain'];
             if (file && allowedTypes.includes(file.type)) {
-                fileNameDisplay.textContent = `קובץ נבחר: ${file.name}`;
-                fileNameDisplay.classList.remove('text-red-500');
+                ui.fileNameDisplay.textContent = `קובץ נבחר: ${file.name}`;
+                ui.fileNameDisplay.classList.remove('text-red-500');
+                ui.fileNameDisplay.classList.add('text-teal-600');
                 processFile(file);
             } else {
-                fileNameDisplay.textContent = file ? 'סוג קובץ לא נתמך.' : '';
-                fileNameDisplay.classList.add('text-red-500');
+                ui.fileNameDisplay.textContent = file ? 'סוג קובץ לא נתמך.' : '';
+                ui.fileNameDisplay.classList.add('text-red-500');
+                ui.fileNameDisplay.classList.remove('text-teal-600');
             }
         }
 
-        fileUploadInput.addEventListener('change', (e) => handleFileSelect(e.target.files[0]));
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            uploadLabel.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
-            uploadLabel.addEventListener(eventName, () => uploadLabel.classList.toggle('dragover', eventName.includes('enter') || eventName.includes('over')), false);
-        });
-        uploadLabel.addEventListener('drop', (e) => handleFileSelect(e.dataTransfer.files[0]), false);
-
         async function processFile(file) {
-            showLoading("מנתח את הקובץ שלך...");
-            const formData = new FormData();
-            formData.append('file', file);
-            
+            showLoading();
             try {
-                const response = await fetch('http://127.0.0.1:5001/parse-booking', { method: 'POST', body: formData });
-                const data = await response.json(); // Always expect JSON
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to parse file');
+                const textContent = await extractTextFromFile(file);
+                if (!textContent || textContent.trim().length < 10) {
+                    throw new Error("לא הצלחנו לקרוא מספיק טקסט מהקובץ. נסה קובץ אחר או הזנה ידנית.");
                 }
+                const data = await getStructuredDataFromGemini(textContent);
+                if (data.error) throw new Error(data.error);
                 hideLoading();
                 openVerificationModal(data);
             } catch (error) {
+                console.error("Error processing file:", error);
                 showError(error.message);
             }
         }
+        
+        async function handleManualSubmit() {
+            if (!validateManualForm()) return;
 
-        // --- Manual Input Logic ---
-        manualSubmitButton.addEventListener('click', () => {
             const data = {
                 hotel_name: document.getElementById('manual-hotel-name').value,
                 check_in_date: document.getElementById('manual-check-in').value,
                 check_out_date: document.getElementById('manual-check-out').value,
                 room_type: document.getElementById('manual-room-type').value,
-                original_price_per_night: parseFloat(document.getElementById('manual-price').value) || 0,
+                original_price: parseFloat(document.getElementById('manual-price').value) || 0,
                 currency: document.getElementById('manual-currency').value
             };
-            if (!data.hotel_name || !data.check_in_date || !data.check_out_date) {
-                alert('אנא מלא את כל שדות החובה.');
-                return;
-            }
-            findDeals(data);
-        });
-
-        // --- Verification Modal Logic ---
-        function openVerificationModal(data) {
-            const fields = {
-                'hotel-name': data.hotel_name,
-                'check-in': data.check_in_date,
-                'check-out': data.check_out_date,
-                'room-type': data.room_type,
-                'price': data.original_price_per_night,
-                'currency': data.currency
-            };
-
-            for (const [id, value] of Object.entries(fields)) {
-                const el = document.getElementById(`modal-${id}`);
-                if (el) el.value = value || (id === 'price' ? 0 : '');
-            }
             
+            findDeals(data);
+        }
+
+        function openVerificationModal(data) {
+            // Populate form fields
+            document.getElementById('modal-hotel-name').value = data.hotel_name || '';
+            document.getElementById('modal-check-in').value = data.check_in_date || '';
+            document.getElementById('modal-check-out').value = data.check_out_date || '';
+            document.getElementById('modal-room-type').value = data.room_type || '';
+            document.getElementById('modal-price').value = data.original_price || 0;
+            
+            const currencySelect = document.getElementById('modal-currency');
+            const currencyExists = [...currencySelect.options].some(opt => opt.value === data.currency);
+            if (data.currency && currencyExists) {
+                currencySelect.value = data.currency;
+            } else if (data.currency) {
+                // Add the currency if it doesn't exist and select it
+                const newOption = new Option(data.currency, data.currency, true, true);
+                currencySelect.add(newOption);
+            }
+
+            // Apply confidence styling
             if (data.confidence) {
+                const confidenceMapping = {
+                    hotel_name: 'modal-hotel-name',
+                    check_in_date: 'modal-check-in',
+                    check_out_date: 'modal-check-out',
+                    room_type: 'modal-room-type',
+                    original_price: 'modal-price',
+                    currency: 'modal-currency'
+                };
                 for (const [key, confidence] of Object.entries(data.confidence)) {
-                    const el = document.getElementById(`modal-${key.replace(/_/g, '-')}`);
+                    const elId = confidenceMapping[key];
+                    const el = document.getElementById(elId);
                     if (el) {
                         el.classList.remove('confidence-low', 'confidence-medium');
                         if (confidence === 'low') el.classList.add('confidence-low');
@@ -260,106 +409,388 @@
                     }
                 }
             }
-
-            verificationModal.classList.remove('hidden');
+            ui.verificationModal.classList.remove('hidden');
         }
 
         function closeModal() {
-            verificationModal.classList.add('hidden');
+            ui.verificationModal.classList.add('hidden');
             resetForms();
         }
 
-        document.getElementById('modal-cancel').addEventListener('click', closeModal);
-
-        document.getElementById('modal-confirm').addEventListener('click', () => {
+        function handleModalConfirm() {
             const verifiedData = {
                 hotel_name: document.getElementById('modal-hotel-name').value,
                 check_in_date: document.getElementById('modal-check-in').value,
                 check_out_date: document.getElementById('modal-check-out').value,
                 room_type: document.getElementById('modal-room-type').value,
-                original_price_per_night: parseFloat(document.getElementById('modal-price').value) || 0,
+                original_price: parseFloat(document.getElementById('modal-price').value) || 0,
                 currency: document.getElementById('modal-currency').value
             };
             closeModal();
             findDeals(verifiedData);
-        });
-
-        // --- Core Logic: Find Deals ---
-        async function findDeals(bookingData) {
-            showLoading("סורק את הרשת למציאת דילים טובים יותר...");
+        }
+        
+        function calculateNights(checkinStr, checkoutStr) {
             try {
-                const response = await fetch('http://127.0.0.1:5001/find-deals', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(bookingData),
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.error || 'Server error');
+                const checkin = new Date(checkinStr);
+                const checkout = new Date(checkoutStr);
+                if (isNaN(checkin.getTime()) || isNaN(checkout.getTime()) || checkout <= checkin) {
+                    return 0;
                 }
-                resultsContentDiv.innerHTML = buildResultHtml(data);
-            } catch (error) {
-                showError(error.message);
-            } finally {
-                hideLoading();
+                const diffTime = checkout.getTime() - checkin.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays > 0 ? diffDays : 1; // Assume at least 1 night
+            } catch (e) {
+                return 0;
             }
         }
 
-        // --- UI Helper Functions ---
-        function showLoading(text) {
-            resultsSection.classList.remove('hidden');
-            loadingDiv.classList.remove('hidden');
-            loadingText.innerHTML = text;
-            resultsContentDiv.innerHTML = '';
+        async function findDeals(bookingData) {
+            showLoading();
+            try {
+                const numberOfNights = calculateNights(bookingData.check_in_date, bookingData.check_out_date);
+                if (numberOfNights === 0) {
+                     throw new Error("תאריכי הצ'ק-אין והצ'ק-אאוט אינם תקינים. אנא בדוק אותם ונסה שוב.");
+                }
+                
+                const newPrices = mockScraper(bookingData, numberOfNights);
+                const finalResponse = await synthesizeFinalResponseWithGemini(bookingData, newPrices, numberOfNights);
+                
+                if (finalResponse.error) throw new Error(finalResponse.error);
+                
+                hideLoading();
+                ui.resultsContentDiv.innerHTML = buildResultHtml(finalResponse, bookingData);
+                // Trigger animation
+                ui.resultsContentDiv.querySelector('.result-appear')?.classList.add('result-appear');
+
+            } catch (error) {
+                console.error("Error finding deals:", error);
+                showError(error.message);
+            }
         }
 
-        function hideLoading() {
-            loadingDiv.classList.add('hidden');
+        // --- File & API Functions ---
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+            });
         }
 
-        function showError(message) {
-            resultsSection.classList.remove('hidden');
-            hideLoading();
-            resultsContentDiv.innerHTML = `<div class="text-center"><h2 class="text-2xl font-bold text-red-500">אופס, משהו השתבש</h2><p class="mt-2 text-slate-600">${message}</p></div>`;
+        async function extractTextFromFile(file) {
+            if (file.type === 'application/pdf') {
+                const loadingTask = pdfjsLib.getDocument(URL.createObjectURL(file));
+                const pdf = await loadingTask.promise;
+                let text = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    text += content.items.map(item => item.str).join(' ');
+                }
+                return text;
+            } else if (file.type === 'text/plain') {
+                return await file.text();
+            } else if (file.type.startsWith('image/')) {
+                const base64 = await fileToBase64(file);
+                const body = {
+                    "contents": [{ "parts": [
+                        { "text": "Extract all text from this image of a hotel booking confirmation. Focus on details like hotel name, dates, prices, and room type." },
+                        { "inline_data": { "mime_type": file.type, "data": base64 } }
+                    ]}]
+                };
+                const response = await fetch(GEMINI_API_URL, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+                if (!response.ok) throw new Error(`שגיאת רשת בניתוח התמונה: ${response.statusText}`);
+                const data = await response.json();
+                return data.candidates[0].content.parts[0].text;
+            }
+            return null;
         }
         
-        function resetForms() {
-            fileNameDisplay.textContent = '';
-            fileUploadInput.value = '';
-            document.getElementById('manual-hotel-name').value = '';
-            document.getElementById('manual-check-in').value = '';
-            document.getElementById('manual-check-out').value = '';
-            document.getElementById('manual-room-type').value = '';
-            document.getElementById('manual-price').value = '';
+        async function apiCallWithJsonMode(prompt, schema) {
+            const payload = {
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: schema,
+              },
+            };
+            const response = await fetch(GEMINI_API_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status} ${response.statusText}`);
+            }
+            const data = await response.json();
+            try {
+                if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    return JSON.parse(data.candidates[0].content.parts[0].text);
+                }
+                throw new Error("Invalid response structure from API.");
+            } catch (e) {
+                console.error("Failed to parse Gemini JSON response:", data);
+                throw new Error("לא הצלחנו לפענח את תשובת השרת.");
+            }
         }
 
-        function buildResultHtml(response) {
-            if (response.status === "SAVINGS_FOUND") {
-                const { title, message, savings_summary } = response;
-                return `
-                    <div class="text-center">
-                        <div class="w-16 h-16 bg-teal-100 text-teal-500 rounded-full flex items-center justify-center mx-auto">
-                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 6v-1m0-1V4m0 2.01V5M12 20v-1m0 1v.01M12 18v-1m0-1v-5m-4 5h8a2 2 0 002-2V9a2 2 0 00-2-2H8a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg>
-                        </div>
-                        <h2 class="text-3xl font-bold text-slate-800 mt-4">${title}</h2>
-                        <p class="mt-2 text-slate-600">${message}</p>
-                        <div class="mt-6 bg-slate-50 rounded-lg p-4">
-                            <p class="text-lg text-slate-500">החיסכון שלך:</p>
-                            <p class="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-500 my-2">${savings_summary.savings_thb.toLocaleString()}฿</p>
-                            <p class="text-2xl text-slate-700">(כ-${savings_summary.savings_ils.toLocaleString()}₪)</p>
-                        </div>
-                        <button class="mt-8 w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-xl font-bold py-4 px-4 rounded-lg hover:opacity-90 transition shadow-lg">הזמן עכשיו וחסוך</button>
-                    </div>`;
+        async function getStructuredDataFromGemini(textContent) {
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    hotel_name: { type: 'STRING', description: 'שם המלון' },
+                    check_in_date: { type: 'STRING', description: 'תאריך צק אין בפורמט YYYY-MM-DD' },
+                    check_out_date: { type: 'STRING', description: 'תאריך צק אאוט בפורמט YYYY-MM-DD' },
+                    room_type: { type: 'STRING', description: 'סוג החדר' },
+                    original_price: { type: 'NUMBER', description: 'המחיר ששולם (סה"כ או ללילה). אם לא נמצא, החזר 0.' },
+                    currency: { type: 'STRING', description: 'קוד מטבע בן 3 אותיות (למשל THB, USD)' },
+                    confidence: {
+                        type: 'OBJECT',
+                        properties: {
+                            hotel_name: { type: 'STRING', enum: ['high', 'medium', 'low'] },
+                            check_in_date: { type: 'STRING', enum: ['high', 'medium', 'low'] },
+                            check_out_date: { type: 'STRING', enum: ['high', 'medium', 'low'] },
+                            room_type: { type: 'STRING', enum: ['high', 'medium', 'low'] },
+                            original_price: { type: 'STRING', enum: ['high', 'medium', 'low'] },
+                            currency: { type: 'STRING', enum: ['high', 'medium', 'low'] },
+                        },
+                        required: ['hotel_name', 'check_in_date', 'check_out_date', 'original_price', 'currency']
+                    }
+                },
+                required: ['hotel_name', 'check_in_date', 'check_out_date', 'original_price', 'currency', 'confidence']
+            };
+            const prompt = `Analyze the following hotel booking confirmation text. Extract the details according to the JSON schema. Be accurate. If a field is not found, use a sensible default (e.g., empty string for room_type, 0 for price). Set confidence level for each field. Today's date is ${new Date().toLocaleDateString('en-CA')}. Text to analyze: --- ${textContent} ---`;
+            return await apiCallWithJsonMode(prompt, schema);
+        }
+
+        function mockScraper(bookingData, numberOfNights) {
+            // This is a mock function for the MVP.
+            // It simulates finding a better price.
+            const originalPricePerNight = (bookingData.original_price / (numberOfNights > 1 ? numberOfNights : 1));
+            const chanceOfFindingSavings = Math.random();
+            
+            if (chanceOfFindingSavings > 0.3) { // 70% chance to find savings
+                return {
+                    agoda_price: Math.round(originalPricePerNight * (Math.random() * (0.95 - 0.75) + 0.75)), // 5%-25% cheaper
+                    booking_com_price: Math.round(originalPricePerNight * (Math.random() * (0.98 - 0.80) + 0.80)) // 2%-20% cheaper
+                };
+            } else { // 30% chance to not find savings
+                 return {
+                    agoda_price: Math.round(originalPricePerNight * 1.05),
+                    booking_com_price: Math.round(originalPricePerNight * 1.02)
+                };
+            }
+        }
+
+        async function synthesizeFinalResponseWithGemini(originalData, newPrices, numberOfNights) {
+             const schema = {
+                type: 'OBJECT',
+                properties: {
+                    status: { type: 'STRING', enum: ['SAVINGS_FOUND', 'NO_SAVINGS'] },
+                    title: { type: 'STRING', description: 'כותרת קצרה וידידותית בעברית.' },
+                    message: { type: 'STRING', description: 'הודעה מפורטת יותר בעברית.' },
+                    savings_summary: {
+                        type: 'OBJECT',
+                        properties: {
+                            original_price_per_night: { type: 'NUMBER' },
+                            best_new_price_per_night: { type: 'NUMBER' },
+                            savings_per_night_original_currency: { type: 'NUMBER' },
+                            total_savings_original_currency: { type: 'NUMBER' },
+                            total_savings_ils: { type: 'NUMBER' },
+                        }
+                    }
+                },
+                required: ['status', 'title', 'message']
+            };
+            const prompt = `You are an assistant for a service named "שילמתי יותר מדי". Compare the user's original hotel booking with new prices and generate a user-friendly response in Hebrew, following the JSON schema.
+
+            - User's original booking: ${JSON.stringify(originalData)}
+            - Number of nights: ${numberOfNights}
+            - New prices found (per night): ${JSON.stringify(newPrices)}
+            - Exchange rates: 1 USD = 3.7 ILS, 1 EUR = 4.0 ILS, 1 GBP = 4.5 ILS, 1 THB = 0.10 ILS.
+
+            Analyze:
+            1. Calculate the original price per night. The user's 'original_price' could be per-night or total. If it's much larger than the new per-night prices, assume it's total and divide by 'numberOfNights'.
+            2. Find the best (lowest) new price per night from the new prices found.
+            3. If the best new price is lower than the original price per night, set status to "SAVINGS_FOUND". Otherwise, "NO_SAVINGS".
+            4. If savings are found, calculate the savings per night, total savings for the stay in the original currency, AND total savings in ILS.
+            5. Populate all fields in the 'savings_summary' object.
+            6. Write a friendly and encouraging title and message in Hebrew. For "NO_SAVINGS", reassure the user they got a great deal. For "SAVINGS_FOUND", highlight the good news.
+            
+            Respond ONLY with the JSON object.`;
+            return await apiCallWithJsonMode(prompt, schema);
+        }
+
+        // --- UI Helper Functions ---
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-5 right-5 bg-slate-800 text-white py-3 px-5 rounded-lg shadow-lg transition-all duration-300 transform translate-y-20 opacity-0';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.classList.remove('translate-y-20', 'opacity-0');
+            }, 10);
+
+            // Animate out
+            setTimeout(() => {
+                notification.classList.add('opacity-0');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 2500);
+        }
+
+        function handleShare(savingsIls, savingsCurrency) {
+            const shareData = {
+                title: 'חסכתי כסף על המלון שלי!',
+                text: `וואו! הרגע חסכתי ${savingsIls} (שזה ${savingsCurrency}) על הזמנת המלון שלי עם "שילמתי יותר מדי"! בדקו אם גם אתם יכולים לחסוך.`,
+                url: window.location.href,
+            };
+
+            if (navigator.share) {
+                navigator.share(shareData).catch(err => console.log("Share failed:", err));
             } else {
-                const { title, message } = response;
-                return `
-                    <div class="text-center">
-                        <div class="w-16 h-16 bg-sky-100 text-sky-500 rounded-full flex items-center justify-center mx-auto">
-                           <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        </div>
-                        <h2 class="text-3xl font-bold text-slate-800 mt-4">${title}</h2>
-                        <p class="mt-4 text-lg text-slate-600">${message}</p>
-                    </div>`;
+                // Fallback: Copy to clipboard
+                const fallbackText = `${shareData.text}\n${shareData.url}`;
+                const textArea = document.createElement("textarea");
+                textArea.value = fallbackText;
+                textArea.style.position = "fixed";
+                textArea.style.top = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showNotification('הקישור הועתק! אפשר לשתף עם חברים.');
+                } catch (err) {
+                    showNotification('אופס, לא הצלחנו להעתיק את הקישור.');
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+
+        function showLoading() { 
+            ui.resultsSection.classList.remove('hidden');
+            ui.loadingDiv.classList.remove('hidden'); 
+            ui.resultsContentDiv.innerHTML = ''; 
+
+            const loadingMessages = [
+                "מנתח את פרטי ההזמנה...",
+                "סורק את Agoda...",
+                "בודק ב-Booking.com...",
+                "משווה מחירים...",
+                "כמעט שם, מסכם את הממצאים..."
+            ];
+            let messageIndex = 0;
+            ui.loadingText.innerHTML = loadingMessages[messageIndex];
+
+            loadingInterval = setInterval(() => {
+                messageIndex = (messageIndex + 1) % loadingMessages.length;
+                ui.loadingText.innerHTML = loadingMessages[messageIndex];
+            }, 2000);
+        }
+        function hideLoading() { 
+            clearInterval(loadingInterval);
+            ui.loadingDiv.classList.add('hidden'); 
+        }
+        function showError(message) { 
+            hideLoading();
+            ui.resultsSection.classList.remove('hidden');
+            const errorHtml = `<div class="text-center result-appear"><h2 class="text-2xl font-bold text-red-500">אופס, משהו השתבש</h2><p class="mt-2 text-slate-600">${message}</p><button onclick="resetAll()" class="mt-4 px-6 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">נסה שוב</button></div>`;
+            ui.resultsContentDiv.innerHTML = errorHtml;
+        }
+        function resetForms() {
+            ui.fileNameDisplay.textContent = '';
+            ui.fileUploadInput.value = '';
+            if (ui.manualForm) {
+                ui.manualForm.reset();
+            }
+            ui.manualFormError.textContent = '';
+            document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+        }
+        function resetAll() {
+            resetForms();
+            ui.resultsSection.classList.add('hidden');
+            switchTab('upload');
+        }
+        
+        function buildResultHtml(response, originalData) {
+            try {
+                if (!response || !response.status) {
+                    throw new Error("התקבלה תשובה לא תקינה מהשרת.");
+                }
+
+                const currencySymbol = new Intl.NumberFormat('en', { style: 'currency', currency: originalData.currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).formatToParts(0).find(p => p.type === 'currency').value;
+
+                if (response.status === "SAVINGS_FOUND") {
+                    const { title, message, savings_summary } = response;
+                    if (savings_summary && typeof savings_summary.total_savings_original_currency === 'number' && typeof savings_summary.total_savings_ils === 'number') {
+                        
+                        const savingsInOriginalCurrencyText = `${savings_summary.total_savings_original_currency.toLocaleString()}${currencySymbol}`;
+                        const savingsInIlsText = `כ-${Math.round(savings_summary.total_savings_ils).toLocaleString()}₪`;
+
+                        return `
+                            <div class="text-center result-appear">
+                                <div class="w-16 h-16 bg-teal-100 text-teal-500 rounded-full flex items-center justify-center mx-auto">
+                                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 6v-1m0-1V4m0 2.01V5M12 20v-1m0 1v.01M12 18v-1m0-1v-5m-4 5h8a2 2 0 002-2V9a2 2 0 00-2-2H8a2 2 0 00-2 2v6a2 2 0 002 2z"></path></svg>
+                                </div>
+                                <h2 class="text-3xl font-bold text-slate-800 mt-4">${title || 'מצאנו חיסכון!'}</h2>
+                                <p class="mt-2 text-slate-600">${message || 'מצאנו הצעה טובה יותר עבורך.'}</p>
+                                
+                                <div class="mt-6 border-t pt-4">
+                                    <div class="price-comparison-grid max-w-sm mx-auto text-lg">
+                                        <span class="text-slate-500 text-right">המחיר שלך (ללילה):</span>
+                                        <span class="text-slate-800 font-bold text-left">${savings_summary.original_price_per_night.toLocaleString()}${currencySymbol}</span>
+                                        
+                                        <span class="text-slate-500 text-right">המחיר החדש (ללילה):</span>
+                                        <span class="text-teal-600 font-bold text-left">${savings_summary.best_new_price_per_night.toLocaleString()}${currencySymbol}</span>
+                                        
+                                        <span class="text-slate-500 text-right font-bold">חיסכון ללילה:</span>
+                                        <span class="text-teal-600 font-bold text-left">${savings_summary.savings_per_night_original_currency.toLocaleString()}${currencySymbol}</span>
+                                    </div>
+                                </div>
+
+                                <div class="mt-6 bg-slate-50 rounded-lg p-4">
+                                    <p class="text-lg text-slate-500">החיסכון הכולל שלך:</p>
+                                    <p class="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-500 my-1">${savingsInIlsText}</p>
+                                    <p class="text-xl text-slate-600">(${savingsInOriginalCurrencyText})</p>
+                                </div>
+                                
+                                <div class="mt-8 grid grid-cols-1 sm:grid-cols-5 gap-2">
+                                    <button class="sm:col-span-4 w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-xl font-bold py-4 px-4 rounded-lg hover:opacity-90 transition shadow-lg">הזמן עכשיו וחסוך (הדמיה)</button>
+                                    <button id="share-button" data-savings-ils="${savingsInIlsText}" data-savings-currency="${savingsInOriginalCurrencyText}" class="w-full bg-sky-100 text-sky-600 flex items-center justify-center py-4 rounded-lg hover:bg-sky-200 transition">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8m-4-6l-4-4m0 0L8 6m4-4v12"></path></svg>
+                                    </button>
+                                </div>
+
+                                <button onclick="resetAll()" class="mt-4 w-full py-2 text-slate-600 hover:text-slate-900">בצע חיפוש חדש</button>
+                            </div>`;
+                    } else {
+                        throw new Error("מצאנו חיסכון, אך ארעה שגיאה בהצגת הסכום המדויק.");
+                    }
+                } else { // NO_SAVINGS
+                    const { title, message } = response;
+                     if (!title || !message) {
+                        throw new Error("התקבלה תשובה לא מלאה מהשרת.");
+                    }
+                    return `
+                        <div class="text-center result-appear">
+                            <div class="w-16 h-16 bg-sky-100 text-sky-500 rounded-full flex items-center justify-center mx-auto">
+                               <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
+                            <h2 class="text-3xl font-bold text-slate-800 mt-4">${title}</h2>
+                            <p class="mt-4 text-lg text-slate-600">${message}</p>
+                            <button onclick="resetAll()" class="mt-8 w-full py-2 text-slate-600 hover:text-slate-900">בצע חיפוש חדש</button>
+                        </div>`;
+                }
+            } catch (e) {
+                console.error("Error building result HTML:", e);
+                return `<div class="text-center"><h2 class="text-2xl font-bold text-red-500">אופס, משהו השתבש</h2><p class="mt-2 text-slate-600">${e.message || 'שגיאה לא ידועה בהצגת התוצאות.'}</p><button onclick="resetAll()" class="mt-4 px-6 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200">נסה שוב</button></div>`;
             }
         }
     </script>
