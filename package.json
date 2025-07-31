@@ -1,0 +1,26 @@
+{
+  "name": "pricedrop-ai",
+  "version": "1.0.0",
+  "description": "PriceDrop AI - Hotel booking price comparison",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo 'Serverless function - no build needed'",
+    "dev": "node server.js",
+    "vercel-build": "echo 'Serverless deployment ready'"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "axios": "^1.6.0",
+    "body-parser": "^1.20.2",
+    "firebase-admin": "^12.2.0",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": "20.x"
+  },
+  "keywords": ["hotel", "booking", "price", "comparison", "ai", "gemini"],
+  "author": "Amit",
+  "license": "MIT"
+}
