@@ -726,3 +726,5 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
 
 // Export app for Vercel
 module.exports = app;
+
+// Final trigger for Vercel deployment
