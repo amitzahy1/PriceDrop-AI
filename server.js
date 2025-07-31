@@ -160,7 +160,7 @@ ${content}`;
 
     try {
         let parts = [];
-        if (contentType.startsWith('image/')) {
+        if (contentType && contentType.startsWith('image/')) {
             parts = [ { text: prompt }, { inline_data: { mime_type: contentType, data: content } } ];
         } else {
             parts = [{ text: prompt }];
