@@ -26,7 +26,7 @@ app.use(cors({
     origin: [
         'https://rebook-7b0e3.web.app',
         'https://rebook-7b0e3.firebaseapp.com',
-        'https://pricedrop-ai.vercel.app',
+        'https://pricedropai.vercel.app', // Corrected URL
         'http://localhost:3000',
         'http://localhost:8080',
         'file://'
